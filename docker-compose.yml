@@ -1,0 +1,113 @@
+# Uso local (mesma maquina, para testar rapido antes de ir ao laboratorio):
+#   docker compose up --build -d server webui
+#   # abra http://localhost:8080 no navegador (interface web), ou:
+#   docker compose run --rm motorista
+#   docker compose run --rm passageiro
+#
+# No laboratorio (LARSID/LADICA), o servidor e cada cliente rodam em
+# CONTEINERES EM MAQUINAS DISTINTAS — nesse caso nao se usa este arquivo
+# (ele so orquestra containers na mesma maquina); veja o README, secao
+# "Emulacao em multiplos computadores", para o comando `docker run`
+# equivalente apontando para o IP real da maquina do servidor.
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "9000:9000"
+    environment:
+      - VAIJUNTO_ADDR=:9000
+
+  webui:
+    build:
+      context: .
+      dockerfile: Dockerfile.webui
+    ports:
+      - "8080:8080"
+    depends_on:
+      - server
+    environment:
+      - VAIJUNTO_ADDR=server:9000
+      - WEBUI_ADDR=:8080
+
+  motorista:
+    build:
+      context: .
+      dockerfile: Dockerfile.motorista
+    depends_on:
+      - server
+    environment:
+      - VAIJUNTO_ADDR=server:9000
+    stdin_open: true
+    tty: true
+
+  passageiro:
+    build:
+      context: .
+      dockerfile: Dockerfile.passageiro
+    depends_on:
+      - server
+    environment:
+      - VAIJUNTO_ADDR=server:9000
+    stdin_open: true
+    tty: true
+
+  # Cliente REST: conecta somente ao servidor da sua empresa.
+  passageiro-rest:
+    build:
+      context: .
+      dockerfile: Dockerfile.passageiro-rest
+    depends_on:
+      - empresa1
+    environment:
+      VAIJUNTO_REST_URL: http://empresa1:8081
+    profiles: ["clientes"]
+
+  # Consorcio distribuido: cada instancia possui arquivo de estado proprio.
+  empresa1:
+    build:
+      context: .
+      dockerfile: Dockerfile.rest
+    ports: ["8081:8081"]
+    environment:
+      SERVER_ID: empresa1
+      HTTP_ADDR: :8081
+      SELF_URL: http://empresa1:8081
+      DATA_FILE: /data/empresa1.json
+      PEERS: http://empresa1:8081,http://empresa2:8081,http://empresa3:8081
+    volumes:
+      - empresa1_data:/data
+
+  empresa2:
+    build:
+      context: .
+      dockerfile: Dockerfile.rest
+    ports: ["8082:8081"]
+    environment:
+      SERVER_ID: empresa2
+      HTTP_ADDR: :8081
+      SELF_URL: http://empresa2:8081
+      DATA_FILE: /data/empresa2.json
+      PEERS: http://empresa1:8081,http://empresa2:8081,http://empresa3:8081
+    volumes:
+      - empresa2_data:/data
+
+  empresa3:
+    build:
+      context: .
+      dockerfile: Dockerfile.rest
+    ports: ["8083:8081"]
+    environment:
+      SERVER_ID: empresa3
+      HTTP_ADDR: :8081
+      SELF_URL: http://empresa3:8081
+      DATA_FILE: /data/empresa3.json
+      PEERS: http://empresa1:8081,http://empresa2:8081,http://empresa3:8081
+    volumes:
+      - empresa3_data:/data
+
+volumes:
+  empresa1_data:
+  empresa2_data:
+  empresa3_data:

@@ -1,0 +1,9 @@
+FROM golang:1.23-alpine AS build
+WORKDIR /src
+COPY go.mod ./
+COPY cmd/passageiro-rest ./cmd/passageiro-rest
+RUN CGO_ENABLED=0 GOOS=linux go build -o /out/passageiro-rest ./cmd/passageiro-rest
+FROM alpine:3.20
+COPY --from=build /out/passageiro-rest /usr/local/bin/passageiro-rest
+ENV VAIJUNTO_REST_URL=http://empresa1:8081
+ENTRYPOINT ["/usr/local/bin/passageiro-rest"]
